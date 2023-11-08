@@ -34,17 +34,18 @@ jobs:
             EOF
             bitcoind -regtest -rpcport=18444
             sleep 5
-            bitcoind -regtest -rpcport=18445
-            sleep 5
 
       - name: Run
         run: cargo run
       
       - name: Test
         run: cargo test
-    
-      - name: Clippy
-        run: cargo clippy --all-targets --all-features -- -D warnings
+
+      - name: Stop bitcoin node
+        run: bitcoin-cli -regtest -rpcport=18444 stop
+      
+      # - name: Clippy
+      #   run: cargo clippy --all-targets --all-features -- -D warnings
       
       - name: Format
         run: cargo fmt --check

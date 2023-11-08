@@ -34,7 +34,7 @@ fn perform_handshake() -> Result<()> {
     stream.flush()?;
 
     // Read the version message response from the peer
-    let mut response_buffer = [0u8; 1024]; // Adjust the buffer size as necessary.
+    let mut response_buffer = [0u8; 1024];
     stream.read(&mut response_buffer)?;
 
     // Create and send a verack message as an acknowledgment
