@@ -1,8 +1,8 @@
-use std::io::{Read, Write, Result};
-use std::net::{IpAddr, Ipv4Addr, SocketAddr, TcpStream};
 use node_handshake::message::{BitcoinMessage, Serializable};
 use node_handshake::network::BitcoinNetwork;
 use node_handshake::vv::{Command, VersionMessage};
+use std::io::{Read, Result, Write};
+use std::net::{IpAddr, Ipv4Addr, SocketAddr, TcpStream};
 
 fn perform_handshake() -> Result<()> {
     let receiver = SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), 18444);

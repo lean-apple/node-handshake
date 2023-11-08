@@ -48,7 +48,6 @@ impl Serializable for BitcoinMessage {
     /// Append the magic value, command, payload size, checksum, and payload
     /// to a byte vector which represents the serialized message
     fn serialize(&self) -> Result<Vec<u8>, Error> {
-        
         // Calculated the total size to avoid reallocation
         // let total_payload_size = COMMAND_SIZE + 4 + CHECKSUM_SIZE + self.payload.len();
         // let mut message = Vec::with_capacity(total_payload_size);
