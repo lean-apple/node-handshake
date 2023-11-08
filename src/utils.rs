@@ -17,6 +17,7 @@ pub fn generate_nonce() -> u64 {
     rng.gen::<u64>()
 }
 
+/// Write a var(iable-length) int(eger) to a byte vector
 pub fn write_varint(payload: &mut Vec<u8>, mut value: u64) {
     while value > 0x7F {
         payload.push((value as u8) & 0x7F | 0x80);

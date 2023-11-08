@@ -14,14 +14,14 @@ const PROTOCOL_VERSION: i32 = 70015;
 #[derive(Debug, Clone, Copy)]
 pub enum Command {
     Version,
-    //Verack,
+    Verack,
 }
 
 impl Command {
     pub fn as_bytes(&self) -> &[u8] {
         match self {
             Command::Version => b"version",
-            // Command::Verack => b"verack",
+            Command::Verack => b"verack",
         }
     }
 }
@@ -79,10 +79,10 @@ impl VersionMessage {
 
         let services = 1;
 
-        // Serialize the receiver node's (remote peer's) network address
+        // Serialize the receiver's node network address
         serialize_socket_add(&mut payload, services, &receiver);
 
-        // Serialize this sender node's network address
+        // Serialize this sender's node network address
         serialize_socket_add(&mut payload, services, &sender);
 
         // Generate nonce to be added to the payload

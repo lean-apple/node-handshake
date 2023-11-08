@@ -99,8 +99,8 @@ mod tests {
         for (item, &byte) in command_bytes.iter().enumerate() {
             command_fixed_size[item] = byte;
         }
-        for item in command_bytes.len()..COMMAND_SIZE {
-            command_fixed_size[item] = 0;
+        for item in command_fixed_size.iter_mut().skip(command_bytes.len()) {
+            *item = 0;
         }
         assert_eq!(&serialized_msg[4..4 + COMMAND_SIZE], &command_fixed_size);
 
