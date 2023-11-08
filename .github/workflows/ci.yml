@@ -1,0 +1,25 @@
+name: ci
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+    paths-ignore:
+      - 'README.md'
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Protobuf Compiler
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y protobuf-compiler
+      
+      - name: Clippy
+        run: cargo clippy --all-targets --all-features -- -D warnings
+      
+      - name: Format
+        run: cargo fmt --check
