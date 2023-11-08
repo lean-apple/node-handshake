@@ -35,7 +35,7 @@ fn perform_handshake() -> Result<()> {
 
     // Read the version message response from the peer
     let mut response_buffer = [0u8; 1024]; // Adjust the buffer size as necessary.
-    stream.read_exact(&mut response_buffer)?;
+    stream.read(&mut response_buffer)?;
 
     // Create and send a verack message as an acknowledgment
     let verack_message = BitcoinMessage::new(Command::Verack, vec![], BitcoinNetwork::Regtest);
@@ -46,7 +46,7 @@ fn perform_handshake() -> Result<()> {
     println!("serialized_verack_msg {:?}", serialized_verack_msg);
 
     // Read the verack message response from the peer
-    stream.read_exact(&mut response_buffer)?;
+    stream.read(&mut response_buffer)?;
 
     Ok(())
 }
