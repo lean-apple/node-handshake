@@ -32,7 +32,7 @@ jobs:
             rpcpassword=password
             rpcallowip=127.0.0.1
             EOF
-            bitcoind -regtest -rpcport=18444
+            bitcoind -regtest
             sleep 5
 
       - name: Run
@@ -42,10 +42,10 @@ jobs:
         run: cargo test
 
       - name: Stop bitcoin node
-        run: bitcoin-cli -regtest -rpcport=18444 stop
+        run: bitcoin-cli -regtest stop
       
-      # - name: Clippy
-      #   run: cargo clippy --all-targets --all-features -- -D warnings
+      - name: Clippy
+        run: cargo clippy --all-targets --all-features -- -D warnings
       
       - name: Format
         run: cargo fmt --check
