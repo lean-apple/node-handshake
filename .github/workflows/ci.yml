@@ -12,12 +12,36 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-
-      - name: Install Protobuf Compiler
+    
+      - name: Install Bitcoin
         run: |
-          sudo apt-get update
-          sudo apt-get install -y protobuf-compiler
+            sudo apt update && sudo apt upgrade
+            sudo add-apt-repository ppa:luke-jr/bitcoincore
+            sudo apt-get update
+            sudo apt-get install bitcoind
+
+      - name: Check bitcoind setup with version
+        run: bitcoind --version
+       
+      - name: Config and start Bitcoin nodes
+        run: |
+            mkdir ~/.bitcoin/
+            cat << EOF >> ~/.bitcoin/bitcoin.conf
+            regtest=1
+            daemon=1
+            rpcuser=username
+            rpcpassword=password
+            rpcallowip=127.0.0.1
+            EOF
+            bitcoind -regtest -rpcport=18444
+            sleep 5
+
+      - name: Run
+        run: cargo run
       
+      - name: Test
+        run: cargo test
+    
       - name: Clippy
         run: cargo clippy --all-targets --all-features -- -D warnings
       
