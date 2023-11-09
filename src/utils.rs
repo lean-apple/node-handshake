@@ -17,21 +17,12 @@ pub fn generate_nonce() -> u64 {
     rng.gen::<u64>()
 }
 
-/// Write a var(iable-length) int(eger) to a byte vector
-pub fn write_varint(payload: &mut Vec<u8>, mut value: u64) {
-    while value > 0x7F {
-        payload.push((value as u8) & 0x7F | 0x80);
-        value >>= 7;
-    }
-    payload.push(value as u8);
-}
-
 // First 4 bytes of the double hash
 pub const CHECKSUM_SIZE: usize = 4;
 
 /// Calculate the checksum for the Bitcoin message from the payload/data
 /// Bitcoin checksums are created by hashing data through SHA256 twice  
-/// and taking the first 4 bytes
+/// and only the first 4 bytes are used
 pub fn calculate_checksum(data: Vec<u8>) -> [u8; CHECKSUM_SIZE] {
     let hash = sha256(&sha256(&data)[..]);
     let mut checksum = [0u8; CHECKSUM_SIZE];

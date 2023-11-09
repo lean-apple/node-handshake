@@ -1,15 +1,13 @@
-use super::messages::{BitcoinMessage, Serializable};
-use super::network::{serialize_socket_add, BitcoinNetwork};
-use super::utils::{calculate_timestamp, generate_nonce, write_varint};
-use byteorder::{LittleEndian, WriteBytesExt};
-use std::io::Error;
+use super::messages::Serializable;
+use super::network::{deserialize_socket_add, serialize_socket_add};
+use super::utils::{calculate_timestamp, generate_nonce};
+use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
+use std::io::{Cursor, Error, ErrorKind};
 use std::net::SocketAddr;
 
 // Constants for the Bitcoin protocol
-// First 4 bytes of the double hash
-pub const CHECKSUM_SIZE: usize = 4;
 // Last version released in Jan 2017
-const PROTOCOL_VERSION: i32 = 70015;
+const PROTOCOL_VERSION: i32 = 70001i32;
 
 #[derive(Debug, Clone, Copy)]
 pub enum Command {
@@ -18,11 +16,14 @@ pub enum Command {
 }
 
 impl Command {
-    pub fn as_bytes(&self) -> &[u8] {
+    pub fn as_str(&self) -> &str {
         match self {
-            Command::Version => b"version",
-            Command::Verack => b"verack",
+            Command::Version => "version",
+            Command::Verack => "verack",
         }
+    }
+    pub fn as_bytes(&self) -> Vec<u8> {
+        self.as_str().as_bytes().to_vec()
     }
 }
 
@@ -34,7 +35,7 @@ pub struct VersionMessage {
     receiver: SocketAddr,
     sender: SocketAddr,
     nonce: u64,
-    user_agent: String,
+    _user_agent: String,
     start_height: i32,
     relay: bool,
 }
@@ -43,103 +44,83 @@ impl VersionMessage {
     pub fn new(
         receiver: SocketAddr,
         sender: SocketAddr,
-        user_agent: String,
+        _user_agent: String,
         start_height: i32,
         relay: bool,
     ) -> Self {
         Self {
             version: PROTOCOL_VERSION,
-            services: 1,
+            services: 0x1,
             timestamp: calculate_timestamp(),
             receiver,
             sender,
             nonce: generate_nonce(),
-            user_agent,
+            _user_agent,
             start_height,
             relay,
         }
-    }
-    /// Create Bitcoin version Message
-    /// Add the different message components to the future payload
-    pub fn create(
-        network: BitcoinNetwork,
-        receiver: SocketAddr,
-        sender: SocketAddr,
-        user_agent: String,
-        start_height: i32,
-        relay: bool,
-    ) -> Result<BitcoinMessage, Error> {
-        // Start constructing the payload
-        let mut payload = Vec::new();
-        payload.write_i32::<LittleEndian>(PROTOCOL_VERSION).unwrap();
-        payload.write_u64::<LittleEndian>(1).unwrap();
-
-        payload
-            .write_i64::<LittleEndian>(calculate_timestamp())
-            .unwrap();
-
-        // TODO: Move as argument
-        // 1 has been chosen to indicated its a network node
-        let services = 1;
-
-        // Serialize the receiver's node network address and add to the payload
-        serialize_socket_add(&mut payload, services, &receiver)?;
-
-        // Serialize this sender's node network address and add to the payload
-        serialize_socket_add(&mut payload, services, &sender)?;
-
-        // Generate nonce to be added to the payload
-        let nonce = generate_nonce();
-        payload.write_u64::<LittleEndian>(nonce).unwrap();
-
-        let user_agent_bytes = user_agent.as_bytes();
-        // Variable user agent length integer
-        write_varint(&mut payload, user_agent_bytes.len() as u64);
-        payload.extend_from_slice(user_agent_bytes);
-
-        payload.write_i32::<LittleEndian>(start_height).unwrap();
-        payload.write_u8(relay as u8).unwrap();
-
-        Ok(BitcoinMessage {
-            command: Command::Version.as_bytes().to_vec(),
-            payload,
-            network,
-        })
     }
 }
 
 impl Serializable for VersionMessage {
     fn serialize(&self) -> Result<Vec<u8>, Error> {
-        // Start constructing the payload
         let mut message = Vec::new();
 
-        message.write_i32::<LittleEndian>(self.version)?;
-        message.write_u64::<LittleEndian>(self.services)?;
-        message.write_i64::<LittleEndian>(self.timestamp)?;
-        message.write_i32::<LittleEndian>(PROTOCOL_VERSION)?;
-        message.write_u64::<LittleEndian>(1)?;
-
-        let tmstp = calculate_timestamp();
-        message.write_i64::<LittleEndian>(tmstp)?;
-
-        let services = 1;
+        // Constructing the payload adding all version message elements
+        message.extend(&self.version.to_le_bytes());
+        message.extend(&self.services.to_le_bytes());
+        message.extend(&self.timestamp.to_le_bytes());
 
         // Serialize the receiver node's (remote peer's) network address
-        serialize_socket_add(&mut message, services, &self.receiver)?;
+        serialize_socket_add(&mut message, self.services, &self.receiver)?;
 
         // Serialize this sender node's network address
-        serialize_socket_add(&mut message, services, &self.sender)?;
+        serialize_socket_add(&mut message, self.services, &self.sender)?;
 
+        // Add nonce to the payload
         message.write_u64::<LittleEndian>(self.nonce)?;
-
-        let user_agent_bytes = self.user_agent.as_bytes();
-        // Variable user agent length integer
-        write_varint(&mut message, user_agent_bytes.len() as u64);
-        message.extend_from_slice(user_agent_bytes);
-
+        // Allocation for the user agent
+        message.extend(&[0]);
         message.write_i32::<LittleEndian>(self.start_height)?;
         message.write_u8(self.relay as u8)?;
-
+        // Allocation for the relay
+        message.extend(&[0]);
         Ok(message)
+    }
+
+    fn deserialize(msg: Vec<u8>) -> Result<Box<Self>, Error> {
+        let mut cursor = Cursor::new(msg);
+
+        let version = cursor.read_i32::<LittleEndian>()?;
+        if version < PROTOCOL_VERSION {
+            return Err(Error::new(
+                ErrorKind::InvalidData,
+                "Unsupported protocol version",
+            ));
+        }
+
+        let services = cursor.read_u64::<LittleEndian>()?;
+        let timestamp = cursor.read_i64::<LittleEndian>()?;
+
+        let receiver = deserialize_socket_add(&mut cursor)?;
+        let sender = deserialize_socket_add(&mut cursor)?;
+
+        let user_agent_byte = cursor.read_u8()?;
+
+        let nonce = cursor.read_u64::<LittleEndian>()?;
+        let start_height = cursor.read_i32::<LittleEndian>()?;
+        let relay = cursor.read_u8()? > 0;
+
+        Ok(Box::new(VersionMessage {
+            version,
+            services,
+            timestamp,
+            receiver,
+            sender,
+            nonce,
+            _user_agent: user_agent_byte.to_string(),
+            start_height,
+            relay,
+        }))
     }
 }

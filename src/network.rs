@@ -1,6 +1,6 @@
-use byteorder::{LittleEndian, WriteBytesExt};
-use std::io::Error;
-use std::net::SocketAddr;
+use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
+use std::io::{Error, Read};
+use std::net::{Ipv4Addr, Ipv6Addr, SocketAddr, SocketAddrV4, SocketAddrV6};
 
 /// Different Bitcoin networks
 #[derive(Debug, Clone, Copy)]
@@ -21,6 +21,9 @@ impl BitcoinNetwork {
             BitcoinNetwork::Regtest => [0xfa, 0xbf, 0xb5, 0xda], // 0xDAB5BFFA
             BitcoinNetwork::Testnet3 => [0x0b, 0x11, 0x09, 0x07], // 0x0709110B
         }
+    }
+    pub fn as_u32(&self) -> u32 {
+        u32::from_le_bytes(self.magic())
     }
 }
 
@@ -53,6 +56,36 @@ pub fn serialize_socket_add(
     }
     payload.write_u16::<LittleEndian>(add.port())?;
     Ok(())
+}
+
+/// Helper to deserialize a SocketAddr from a slice of bytes
+pub fn deserialize_socket_add(cursor: &mut std::io::Cursor<Vec<u8>>) -> Result<SocketAddr, Error> {
+    let _services = cursor.read_u64::<LittleEndian>()?;
+
+    // Check if we have an IPv4-mapped IPv6 address or a regular IPv6 address
+    let mut addr_buf = [0u8; 16];
+    cursor.read_exact(&mut addr_buf)?;
+
+    let addr = if addr_buf[..10] == [0u8; 10] && addr_buf[10..12] == [0xff, 0xff] {
+        // If it is IPv4-mapped IPv6 address
+        let ipv4_bytes = &addr_buf[12..16];
+        let ipv4_addr = Ipv4Addr::new(ipv4_bytes[0], ipv4_bytes[1], ipv4_bytes[2], ipv4_bytes[3]);
+        SocketAddr::V4(SocketAddrV4::new(
+            ipv4_addr,
+            cursor.read_u16::<LittleEndian>()?,
+        ))
+    } else {
+        // If it is a regular IPv6 address
+        let ipv6_addr = Ipv6Addr::from(addr_buf);
+        SocketAddr::V6(SocketAddrV6::new(
+            ipv6_addr,
+            cursor.read_u16::<LittleEndian>()?,
+            0,
+            0,
+        ))
+    };
+
+    Ok(addr)
 }
 
 #[cfg(test)]
