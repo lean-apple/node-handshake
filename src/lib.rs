@@ -1,4 +1,4 @@
-pub mod message;
+pub mod messages;
 pub mod network;
 pub mod utils;
 pub mod vv;

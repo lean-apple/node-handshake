@@ -1,4 +1,4 @@
-use super::message::{BitcoinMessage, Serializable};
+use super::messages::{BitcoinMessage, Serializable};
 use super::network::{serialize_socket_add, BitcoinNetwork};
 use super::utils::{calculate_timestamp, generate_nonce, write_varint};
 use byteorder::{LittleEndian, WriteBytesExt};
@@ -60,6 +60,7 @@ impl VersionMessage {
         }
     }
     /// Create Bitcoin version Message
+    /// Add the different message components to the future payload
     pub fn create(
         network: BitcoinNetwork,
         receiver: SocketAddr,
@@ -77,13 +78,15 @@ impl VersionMessage {
             .write_i64::<LittleEndian>(calculate_timestamp())
             .unwrap();
 
+        // TODO: Move as argument
+        // 1 has been chosen to indicated its a network node
         let services = 1;
 
-        // Serialize the receiver's node network address
-        serialize_socket_add(&mut payload, services, &receiver);
+        // Serialize the receiver's node network address and add to the payload
+        serialize_socket_add(&mut payload, services, &receiver)?;
 
-        // Serialize this sender's node network address
-        serialize_socket_add(&mut payload, services, &sender);
+        // Serialize this sender's node network address and add to the payload
+        serialize_socket_add(&mut payload, services, &sender)?;
 
         // Generate nonce to be added to the payload
         let nonce = generate_nonce();
@@ -122,10 +125,10 @@ impl Serializable for VersionMessage {
         let services = 1;
 
         // Serialize the receiver node's (remote peer's) network address
-        serialize_socket_add(&mut message, services, &self.receiver);
+        serialize_socket_add(&mut message, services, &self.receiver)?;
 
         // Serialize this sender node's network address
-        serialize_socket_add(&mut message, services, &self.sender);
+        serialize_socket_add(&mut message, services, &self.sender)?;
 
         message.write_u64::<LittleEndian>(self.nonce)?;
 

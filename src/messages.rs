@@ -115,10 +115,12 @@ mod tests {
 
     #[test]
     fn test_create_version_message_ok() {
-        // Parameters for the version message
+        // Parameters for the version message on Testnet3 network
         let network = BitcoinNetwork::Testnet3;
-        let add_recv = SocketAddr::from_str("127.0.0.1:8333").unwrap();
-        let add_from = SocketAddr::from_str("127.0.0.1:8333").unwrap();
+        let add_recv =
+            SocketAddr::from_str("127.0.0.1:18333").expect("Failed to convert to socket address");
+        let add_from =
+            SocketAddr::from_str("127.0.0.1:18334").expect("Failed to convert to socket address");
         let user_agent = "/rust-bitcoin:0.1/".to_string();
         let start_height = 0;
         let relay = false;
