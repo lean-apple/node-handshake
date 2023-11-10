@@ -8,6 +8,7 @@ mod tests {
 
     // These tests are supposed to be run in parallel with a bitcoin node
     // Depending on the network chosen
+    // Here Regtest Network is picked
 
     #[test]
     // Basically same test than in main
@@ -28,7 +29,7 @@ mod tests {
     }
 
     #[test]
-
+    // Check the connection is refused for an uncorrect IP
     fn test_perform_handshake_error_wrong_ip() {
         let add_rec =
             SocketAddr::from_str("127.0.0.1:1899").expect("Failed to convert to socket address");

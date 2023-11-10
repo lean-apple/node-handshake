@@ -27,8 +27,8 @@ impl BitcoinNetwork {
     }
 }
 
-/// Helper to serialize IP address either V4 or V6 address
-/// In Bitcoin protocol, when serializing data structures such as network addresses
+/// Helper to serialize IP address either V4 or V6
+/// For the Bitcoin protocol, when serializing data structures such as network addresses
 /// Each address is prefixed with the services field
 /// Once the address is serialized, it is added to the payload
 pub fn add_serialize_addr(
@@ -44,7 +44,6 @@ pub fn add_serialize_addr(
             payload.extend(&[0; 10]);
             // Next 2 bytes are 0xff representing IPv4-mapping
             payload.extend(&[0xff, 0xff]);
-            // IPv4 address
             payload.extend(&add_v4.ip().octets());
         }
         SocketAddr::V6(add_v6) => {
@@ -84,7 +83,6 @@ pub fn read_deserialized_add(cursor: &mut std::io::Cursor<Vec<u8>>) -> Result<So
             0,
         ))
     };
-
     Ok(addr)
 }
 

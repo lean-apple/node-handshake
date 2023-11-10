@@ -9,15 +9,13 @@ pub const COMMAND_SIZE: usize = 12;
 // First 4 bytes of the double hash
 pub const CHECKSUM_SIZE: usize = 4;
 
-/// Trait for serializable Message structures
+/// Trait for operate serialization on different Message structures
 pub trait Serializable {
     fn serialize(&self) -> Result<Vec<u8>, Error>;
     fn deserialize(msg: Vec<u8>) -> Result<Box<Self>, Error>;
 }
 
 /// Bitcoin protocol message
-/// Only two elements are stored in the struct
-/// The other ones are get from the serialization
 /// All the Bitcoin Message components are documented here
 /// https://en.bitcoin.it/wiki/Protocol_documentation#Message_structure
 #[derive(Debug, Clone)]
@@ -35,6 +33,7 @@ pub struct BitcoinMessage {
 }
 
 impl BitcoinMessage {
+    /// Create Bitcoin Message following the Bitcoin protocol rules
     pub fn new(command: Command, payload: Vec<u8>, network: BitcoinNetwork) -> Self {
         let command = command
             .as_fixed_length_vec()
@@ -69,6 +68,7 @@ impl Serializable for BitcoinMessage {
 
         Ok(message)
     }
+    /// Deserialize Bitcoin messagee
     fn deserialize(msg: Vec<u8>) -> Result<Box<Self>, Error> {
         let mut cursor = Cursor::new(msg);
 
@@ -94,7 +94,7 @@ impl Serializable for BitcoinMessage {
         let mut payload = vec![0u8; payload_size];
         cursor.read_exact(&mut payload)?;
 
-        // Verify the checksum
+        // Verify the checksum once the payload is read
         let calculated_checksum = calculate_checksum(payload.clone());
         if checksum != calculated_checksum {
             return Err(Error::new(ErrorKind::InvalidData, "Invalid checksum"));
@@ -120,7 +120,7 @@ mod tests {
 
     #[test]
     fn test_serializating_message_ok() {
-        // Create a dummy payload and its related message from the command
+        // Create a dummy payload and its related message for a Version type message/command
         let payload = vec![0xef, 0xab, 0xef, 0xdf];
         let message =
             BitcoinMessage::new(Command::Version, payload.clone(), BitcoinNetwork::Testnet3);
@@ -164,7 +164,7 @@ mod tests {
 
         let payload = version_message
             .serialize()
-            .expect("Failed to serialized version message");
+            .expect("Failed to serialized version message and created Bitcoin message payload");
         let bitcoin_message = BitcoinMessage::new(Command::Version, payload, network);
         let serialized_msg = bitcoin_message
             .serialize()

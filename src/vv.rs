@@ -7,10 +7,14 @@ use std::net::SocketAddr;
 
 // Constants for the Bitcoin protocol
 const PROTOCOL_VERSION: i32 = 70001i32;
+// Service contanst that corresponds to a full node that can serve the full blockchain
+const NODE_NETWORK_SERVICE: u64 = 1;
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum Command {
+    // Message used when two nodes first connect
     Version,
+    // Response message sent after a version message
     Verack,
 }
 
@@ -21,6 +25,7 @@ impl Command {
             Command::Verack => "verack",
         }
     }
+    // Return specific fixed-size bytes array for
     pub fn as_fixed_length_vec(&self) -> Result<[u8; COMMAND_SIZE], Error> {
         let bytes = self.as_str().as_bytes();
         if bytes.len() > COMMAND_SIZE {
@@ -29,7 +34,6 @@ impl Command {
                 "Command string is too long",
             ));
         }
-
         let mut command_fixed: [u8; COMMAND_SIZE] = [0; COMMAND_SIZE];
         for (i, &byte) in bytes.iter().enumerate() {
             command_fixed[i] = byte;
@@ -39,16 +43,28 @@ impl Command {
     }
 }
 
+/// Version message used for a first connection between nodes
+/// Referred to Bitcoin documentation
+/// https://en.bitcoin.it/wiki/Protocol_documentation#version
 #[derive(Debug)]
 pub struct VersionMessage {
+    // Highest Bitcoin protocol version the node can use
     version: i32,
+    // Bitmask describing the services supported by the node
     services: u64,
+    // Timestamp recording the message creation
     timestamp: i64,
+    // Node's address receiving the version message
     receiver: SocketAddr,
+    // Node's address initializing the connection
     sender: SocketAddr,
+    // Random nonce to detection connection to self
     nonce: u64,
+    // Software running on the node
     _user_agent: String,
+    // Highest block number
     start_height: i32,
+    // Indicated if the node wants to receive relayed transactions
     relay: bool,
 }
 
@@ -62,7 +78,7 @@ impl VersionMessage {
     ) -> Self {
         Self {
             version: PROTOCOL_VERSION,
-            services: 0x1,
+            services: NODE_NETWORK_SERVICE,
             timestamp: calculate_timestamp(),
             receiver,
             sender,
@@ -75,7 +91,7 @@ impl VersionMessage {
 }
 
 impl Serializable for VersionMessage {
-    // Serialize VersionMessage to be send to node
+    // Serialize VersionMessage to bytes to be send to node
     fn serialize(&self) -> Result<Vec<u8>, Error> {
         let mut message = Vec::new();
 
@@ -101,7 +117,7 @@ impl Serializable for VersionMessage {
         Ok(message)
     }
 
-    // Deserialize to be able to check the response content
+    // Deserialization used to verify the response content
     fn deserialize(msg: Vec<u8>) -> Result<Box<Self>, Error> {
         let mut cursor = Cursor::new(msg);
 
@@ -139,6 +155,8 @@ impl Serializable for VersionMessage {
     }
 }
 
+/// Verack Message sent in response to a Version message
+/// More information https://en.bitcoin.it/wiki/Protocol_documentation#verack
 #[derive(Debug, PartialEq)]
 pub struct VerackMessage {
     // Magic Key for the Bitcoin network
@@ -152,6 +170,7 @@ pub struct VerackMessage {
 }
 
 impl VerackMessage {
+    // Create Verack Message with Version message parameters
     pub fn new(network: BitcoinNetwork, resp_command: Command) -> Self {
         let command = resp_command
             .as_fixed_length_vec()

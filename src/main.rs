@@ -5,6 +5,7 @@ use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 
 fn main() -> Result<(), Error> {
     // Example parameters for a simple handshake
+    // Bitcoin node listens by default on 18444 on regtest network
     let sender = SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), 18444);
     let receiver = SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), 18445);
     let user_agent = "/my-bitcoin-client:0.1.0/".to_string();
