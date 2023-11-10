@@ -1,15 +1,14 @@
-use super::messages::Serializable;
-use super::network::{deserialize_socket_add, serialize_socket_add};
-use super::utils::{calculate_timestamp, generate_nonce};
+use super::messages::{Serializable, CHECKSUM_SIZE, COMMAND_SIZE};
+use super::network::{add_serialize_socket, read_deserialized_add, BitcoinNetwork};
+use super::utils::{calculate_checksum, calculate_timestamp, generate_nonce};
 use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
-use std::io::{Cursor, Error, ErrorKind};
+use std::io::{Cursor, Error, ErrorKind, Read};
 use std::net::SocketAddr;
 
 // Constants for the Bitcoin protocol
-// Last version released in Jan 2017
 const PROTOCOL_VERSION: i32 = 70001i32;
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub enum Command {
     Version,
     Verack,
@@ -22,8 +21,21 @@ impl Command {
             Command::Verack => "verack",
         }
     }
-    pub fn as_bytes(&self) -> Vec<u8> {
-        self.as_str().as_bytes().to_vec()
+    pub fn as_fixed_length_vec(&self) -> Result<[u8; COMMAND_SIZE], Error> {
+        let bytes = self.as_str().as_bytes();
+        if bytes.len() > COMMAND_SIZE {
+            return Err(Error::new(
+                ErrorKind::InvalidInput,
+                "Command string is too long",
+            ));
+        }
+
+        let mut command_fixed: [u8; COMMAND_SIZE] = [0; COMMAND_SIZE];
+        for (i, &byte) in bytes.iter().enumerate() {
+            command_fixed[i] = byte;
+        }
+
+        Ok(command_fixed)
     }
 }
 
@@ -63,6 +75,7 @@ impl VersionMessage {
 }
 
 impl Serializable for VersionMessage {
+    // Serialize VersionMessage to be send to node
     fn serialize(&self) -> Result<Vec<u8>, Error> {
         let mut message = Vec::new();
 
@@ -72,10 +85,10 @@ impl Serializable for VersionMessage {
         message.extend(&self.timestamp.to_le_bytes());
 
         // Serialize the receiver node's (remote peer's) network address
-        serialize_socket_add(&mut message, self.services, &self.receiver)?;
+        add_serialize_socket(&mut message, self.services, &self.receiver)?;
 
         // Serialize this sender node's network address
-        serialize_socket_add(&mut message, self.services, &self.sender)?;
+        add_serialize_socket(&mut message, self.services, &self.sender)?;
 
         // Add nonce to the payload
         message.write_u64::<LittleEndian>(self.nonce)?;
@@ -88,6 +101,7 @@ impl Serializable for VersionMessage {
         Ok(message)
     }
 
+    // Deserialize to be able to check the response content
     fn deserialize(msg: Vec<u8>) -> Result<Box<Self>, Error> {
         let mut cursor = Cursor::new(msg);
 
@@ -102,8 +116,8 @@ impl Serializable for VersionMessage {
         let services = cursor.read_u64::<LittleEndian>()?;
         let timestamp = cursor.read_i64::<LittleEndian>()?;
 
-        let receiver = deserialize_socket_add(&mut cursor)?;
-        let sender = deserialize_socket_add(&mut cursor)?;
+        let receiver = read_deserialized_add(&mut cursor)?;
+        let sender = read_deserialized_add(&mut cursor)?;
 
         let user_agent_byte = cursor.read_u8()?;
 
@@ -122,5 +136,76 @@ impl Serializable for VersionMessage {
             start_height,
             relay,
         }))
+    }
+}
+
+#[derive(Debug, PartialEq)]
+pub struct VerackMessage {
+    // Magic Key for the Bitcoin network
+    magic: u32,
+    // ASCII string identifying the packet content - holds the command of the message
+    command: [u8; 12],
+    // Potential argument of verack message
+    length: u32,
+    // Potential argument of verack message
+    checksum: u32,
+}
+
+impl VerackMessage {
+    pub fn new(network: BitcoinNetwork, resp_command: Command) -> Self {
+        let command = resp_command
+            .as_fixed_length_vec()
+            .expect("Complete and convert command size");
+        Self {
+            magic: network.as_u32(),
+            command,
+            length: 0,
+            checksum: u32::from_ne_bytes(calculate_checksum([].to_vec())),
+        }
+    }
+    /// Help to deserialize verack message answer
+    /// Veirfy magic number and Command that was originally sent
+    pub fn deserialize_and_verify(
+        msg: Vec<u8>,
+        network: BitcoinNetwork,
+        resp_command: Command,
+    ) -> Result<Self, Error> {
+        let mut cursor = Cursor::new(msg.clone());
+
+        // Check the magic number
+        let magic = cursor.read_u32::<LittleEndian>()?;
+        if magic != network.as_u32() {
+            return Err(Error::new(
+                ErrorKind::InvalidData,
+                "Invalid magic number in verack response",
+            ));
+        }
+
+        // Read and check the command that was sent
+        let mut command = [0u8; COMMAND_SIZE];
+        cursor.read_exact(&mut command)?;
+        let verack_command = resp_command
+            .as_fixed_length_vec()
+            .expect("Complete and convert command size");
+        if command != verack_command {
+            return Err(Error::new(
+                ErrorKind::InvalidData,
+                "Invalid command in verack response",
+            ));
+        };
+
+        let length = cursor.read_u32::<LittleEndian>()?;
+
+        // Read the checksum
+        // Impossible to check on which payload it was used
+        let mut checksum = [0u8; CHECKSUM_SIZE];
+        cursor.read_exact(&mut checksum)?;
+
+        Ok(VerackMessage {
+            magic,
+            command,
+            length,
+            checksum: u32::from_ne_bytes(checksum),
+        })
     }
 }

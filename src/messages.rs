@@ -5,7 +5,7 @@ use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
 use std::io::{Cursor, Error, ErrorKind, Read};
 
 // Constants for the Bitcoin protocol
-const COMMAND_SIZE: usize = 12;
+pub const COMMAND_SIZE: usize = 12;
 // First 4 bytes of the double hash
 pub const CHECKSUM_SIZE: usize = 4;
 
@@ -36,15 +36,15 @@ pub struct BitcoinMessage {
 
 impl BitcoinMessage {
     pub fn new(command: Command, payload: Vec<u8>, network: BitcoinNetwork) -> Self {
-        let mut command_v = Vec::with_capacity(COMMAND_SIZE);
-        command_v.extend_from_slice(&command.as_bytes());
-        command_v.resize(COMMAND_SIZE, 0);
+        let command = command
+            .as_fixed_length_vec()
+            .expect("Complete and convert command size");
 
         let payload_length = payload.len();
         let checksum = calculate_checksum(payload.clone());
         Self {
             magic: network.as_u32(),
-            command: command_v.try_into().unwrap(),
+            command,
             length: payload_length as u32,
             checksum: u32::from_ne_bytes(checksum),
             payload,
@@ -86,7 +86,7 @@ impl Serializable for BitcoinMessage {
         // Read the payload size
         let payload_size = cursor.read_u32::<LittleEndian>()? as usize;
 
-        // Read and check the checksum
+        // Read the checksum
         let mut checksum = [0u8; CHECKSUM_SIZE];
         cursor.read_exact(&mut checksum)?;
 
@@ -132,15 +132,10 @@ mod tests {
         assert_eq!(&serialized_msg[0..4], &BitcoinNetwork::Testnet3.magic());
 
         // Check command
-        let command_bytes = Command::Version.as_bytes();
-        let mut command_fixed_size = [0u8; COMMAND_SIZE];
-        for (item, &byte) in command_bytes.iter().enumerate() {
-            command_fixed_size[item] = byte;
-        }
-        for item in command_fixed_size.iter_mut().skip(command_bytes.len()) {
-            *item = 0;
-        }
-        assert_eq!(&serialized_msg[4..4 + COMMAND_SIZE], &command_fixed_size);
+        let command_bytes = Command::Version
+            .as_fixed_length_vec()
+            .expect("Complete and convert command size");
+        assert_eq!(&serialized_msg[4..4 + COMMAND_SIZE], &command_bytes);
 
         // Checks payload size
         assert_eq!(
@@ -160,6 +155,7 @@ mod tests {
             SocketAddr::from_str("127.0.0.1:18333").expect("Failed to convert to socket address");
         let add_from =
             SocketAddr::from_str("127.0.0.1:18334").expect("Failed to convert to socket address");
+
         let user_agent = "/rust-bitcoin:0.1/".to_string();
         let start_height = 0;
         let relay = false;

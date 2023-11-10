@@ -1,6 +1,6 @@
 use super::messages::{BitcoinMessage, Serializable};
 use super::network::BitcoinNetwork;
-use super::vv::{Command, VersionMessage};
+use super::vv::{Command, VerackMessage, VersionMessage};
 use std::io::{Error, Read, Write};
 use std::net::{Shutdown, SocketAddr, TcpStream};
 
@@ -38,11 +38,9 @@ pub fn perform_handshake(
 
     let _ = stream.read_exact(&mut res_version_msg);
 
-    //println!("res_vers_msg : {:?}", res_version_msg);
+    VerackMessage::deserialize_and_verify(res_version_msg.into(), network, Command::Version)
+        .unwrap();
 
-    // let des = BitcoinMessage::deserialize(res_version_msg.into()).unwrap();
-
-    // println!("des version message {:?}", des);
     let _ = stream.shutdown(Shutdown::Both);
 
     Ok(())

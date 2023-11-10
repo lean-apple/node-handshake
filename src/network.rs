@@ -7,9 +7,9 @@ use std::net::{Ipv4Addr, Ipv6Addr, SocketAddr, SocketAddrV4, SocketAddrV6};
 pub enum BitcoinNetwork {
     // Main Network
     Mainnet,
-    // Regression testnet network, easiest for development
+    // Regression Test network, easiest for development
     Regtest,
-    // Testnet network
+    // Test Network
     Testnet3,
 }
 
@@ -29,9 +29,9 @@ impl BitcoinNetwork {
 
 /// Helper to serialize IP address either V4 or V6 address
 /// In Bitcoin protocol, when serializing data structures such as network addresses
-/// Each address is often prefixed with the services field
+/// Each address is prefixed with the services field
 /// Once the address is serialized, it is added to the payload
-pub fn serialize_socket_add(
+pub fn add_serialize_socket(
     payload: &mut Vec<u8>,
     services: u64,
     add: &SocketAddr,
@@ -45,7 +45,7 @@ pub fn serialize_socket_add(
             // Next 2 bytes are 0xff representing IPv4-mapping
             payload.extend(&[0xff, 0xff]);
             // IPv4 address
-            payload.extend_from_slice(&add_v4.ip().octets());
+            payload.extend(&add_v4.ip().octets());
         }
         SocketAddr::V6(add_v6) => {
             // Serialize the IPv6 address directly
@@ -59,7 +59,7 @@ pub fn serialize_socket_add(
 }
 
 /// Helper to deserialize a SocketAddr from a slice of bytes
-pub fn deserialize_socket_add(cursor: &mut std::io::Cursor<Vec<u8>>) -> Result<SocketAddr, Error> {
+pub fn read_deserialized_add(cursor: &mut std::io::Cursor<Vec<u8>>) -> Result<SocketAddr, Error> {
     let _services = cursor.read_u64::<LittleEndian>()?;
 
     // Check if we have an IPv4-mapped IPv6 address or a regular IPv6 address
@@ -101,7 +101,7 @@ mod tests {
         let port = 8080;
         let add = SocketAddr::V4(SocketAddrV4::new(ip, port));
 
-        assert!(serialize_socket_add(&mut payload, services, &add).is_ok());
+        assert!(add_serialize_socket(&mut payload, services, &add).is_ok());
         assert_eq!(payload.len(), 26);
     }
 
@@ -114,7 +114,7 @@ mod tests {
 
         let add = SocketAddr::V6(SocketAddrV6::new(ip, port, 0, 0));
 
-        assert!(serialize_socket_add(&mut payload, services, &add).is_ok());
+        assert!(add_serialize_socket(&mut payload, services, &add).is_ok());
         assert_eq!(payload.len(), 26);
     }
 }
