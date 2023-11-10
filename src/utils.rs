@@ -2,6 +2,9 @@ use openssl::sha::sha256;
 use rand::{thread_rng, Rng};
 use std::time::{SystemTime, UNIX_EPOCH};
 
+// First 4 bytes of the double hash
+pub const CHECKSUM_SIZE: usize = 4;
+
 /// Returns the current standard UNIX timestamp in seconds
 pub fn calculate_timestamp() -> i64 {
     SystemTime::now()
@@ -16,9 +19,6 @@ pub fn generate_nonce() -> u64 {
     let mut rng = thread_rng();
     rng.gen::<u64>()
 }
-
-// First 4 bytes of the double hash
-pub const CHECKSUM_SIZE: usize = 4;
 
 /// Calculate the checksum for the Bitcoin message from the payload/data
 /// Bitcoin checksums are created by hashing data through SHA256 twice  
